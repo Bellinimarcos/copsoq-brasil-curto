@@ -1,7 +1,7 @@
 import streamlit as st
 import gspread
 from datetime import datetime
-import calculadora_copsoq_br as motor # Importa o novo motor de cálculo validado
+import calculadora_copsoq_br as motor # Importa o motor de cálculo da versão BR
 
 # --- CONFIGURAÇÃO INICIAL E ESTADO DA SESSÃO ---
 st.set_page_config(page_title="COPSOQ II – Diagnóstico Psicossocial", layout="wide")
@@ -14,7 +14,7 @@ if 'respostas_br_validado' not in st.session_state:
 NOME_DA_PLANILHA = 'Resultados_COPSOQ_II_BR_Validado'
 
 def salvar_dados(dados_para_salvar):
-    """Salva os dados na Planilha Google de forma segura."""
+    """Salva os dados na Planilha Google de forma segura e com tratamento de erro explícito."""
     try:
         creds = dict(st.secrets["gcp_service_account"])
         creds["private_key"] = creds["private_key"].replace("\\n", "\n")
@@ -27,10 +27,23 @@ def salvar_dados(dados_para_salvar):
             worksheet.update('A1', [cabecalho])
             
         nova_linha = [datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + [str(v) if v is not None else "" for v in dados_para_salvar.values()]
-        worksheet.append_row(nova_linha)
-        return True
+        
+        # A chamada à API que guarda os dados
+        response = worksheet.append_row(nova_linha)
+        
+        # Verificação explícita da resposta para garantir que foi um sucesso
+        if isinstance(response, dict) and "updates" in response:
+             return True # Sucesso esperado
+        else:
+             # Se a resposta não for o dicionário esperado, levanta um erro claro
+             raise TypeError(f"A resposta da API do Google não foi a esperada. Resposta recebida: {response}")
+
+    except gspread.exceptions.SpreadsheetNotFound:
+        st.error(f"Erro Crítico: A planilha '{NOME_DA_PLANILHA}' não foi encontrada. Verifique o nome e as permissões de partilha.")
+        return False
     except Exception as e:
-        st.error(f"Ocorreu um erro ao salvar na planilha: {e}")
+        st.error(f"Ocorreu um erro inesperado ao salvar na planilha: {e}")
+        st.error(f"Tipo do Erro: {type(e)}")
         return False
 
 # --- ESTRUTURA DE DADOS DO QUESTIONÁRIO (VALIDADA) ---
