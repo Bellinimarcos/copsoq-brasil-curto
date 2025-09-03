@@ -3,12 +3,8 @@ import gspread
 from datetime import datetime
 import calculadora_copsoq_br as motor # Importa o motor de cálculo da versão BR
 
-# --- CONFIGURAÇÃO INICIAL E ESTADO DA SESSÃO ---
+# --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="COPSOQ II – Diagnóstico Psicossocial", layout="wide")
-
-# Inicializa o session_state para armazenar as respostas de forma segura
-if 'respostas_br_validado' not in st.session_state:
-    st.session_state.respostas_br_validado = {}
 
 # --- FUNÇÕES DE APOIO (CONEXÃO COM GOOGLE SHEETS) ---
 NOME_DA_PLANILHA = 'Resultados_COPSOQ_II_BR_Validado'
@@ -28,14 +24,11 @@ def salvar_dados(dados_para_salvar):
             
         nova_linha = [datetime.now().strftime("%Y-%m-%d %H:%M:%S")] + [str(v) if v is not None else "" for v in dados_para_salvar.values()]
         
-        # A chamada à API que guarda os dados
         response = worksheet.append_row(nova_linha)
         
-        # Verificação explícita da resposta para garantir que foi um sucesso
         if isinstance(response, dict) and "updates" in response:
-             return True # Sucesso esperado
+             return True
         else:
-             # Se a resposta não for o dicionário esperado, levanta um erro claro
              raise TypeError(f"A resposta da API do Google não foi a esperada. Resposta recebida: {response}")
 
     except gspread.exceptions.SpreadsheetNotFound:
@@ -86,7 +79,15 @@ dimensoes_agrupadas = {
     }
 }
 
-total_perguntas = sum(len(perguntas) for dim in dimensoes_agrupadas.values() for perguntas in dim.values())
+# Cria uma lista única com todas as chaves das perguntas (ex: Q1, Q2...)
+todas_as_chaves = [q_key for theme in dimensoes_agrupadas.values() for dimension in theme.values() for q_key in dimension.keys()]
+total_perguntas = len(todas_as_chaves)
+
+# --- INICIALIZAÇÃO DO ESTADO DA SESSÃO ---
+# Garante que cada chave de pergunta exista no estado da sessão
+for key in todas_as_chaves:
+    if key not in st.session_state:
+        st.session_state[key] = None
 
 # --- INTERFACE PRINCIPAL ---
 st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
@@ -98,7 +99,7 @@ with st.expander("Clique aqui para ver as instruções completas", expanded=True
 st.divider()
 
 # --- BARRA DE PROGRESSO ---
-perguntas_respondidas = len(st.session_state.respostas_br_validado)
+perguntas_respondidas = len([key for key in todas_as_chaves if st.session_state[key] is not None])
 progresso = perguntas_respondidas / total_perguntas if total_perguntas > 0 else 0
 st.progress(progresso, text=f"Progresso: {perguntas_respondidas} de {total_perguntas} perguntas respondidas ({progresso:.0%})")
 st.markdown("---")
@@ -112,22 +113,26 @@ for i, (nome_tema, dimensoes) in enumerate(dimensoes_agrupadas.items()):
         for titulo_dimensao, perguntas in dimensoes.items():
             st.subheader(titulo_dimensao)
             for q_key, q_text in perguntas.items():
-                resposta_guardada = st.session_state.respostas_br_validado.get(q_key)
-                indice = opcoes_escala.index(resposta_guardada) if resposta_guardada in opcoes_escala else None
-                resposta = st.radio(label=q_text, options=opcoes_escala, key=q_key, horizontal=True, index=indice)
-                if resposta:
-                    st.session_state.respostas_br_validado[q_key] = resposta
+                # O widget radio agora lê e escreve diretamente em st.session_state[q_key]
+                st.radio(label=q_text, options=opcoes_escala, key=q_key, horizontal=True)
             st.markdown("---")
 
 # --- LÓGICA DE FINALIZAÇÃO E ENVIO ---
+# A verificação do progresso é feita aqui, no final do script, após todos os widgets terem sido processados.
 if progresso == 1.0:
     st.success("🎉 **Excelente! Você respondeu a todas as perguntas.**")
     if st.button("Enviar Respostas", type="primary", use_container_width=True):
         with st.spinner('Calculando e enviando...'):
-            resultados_dimensoes = motor.calcular_dimensoes(st.session_state.respostas_br_validado)
-            dados_completos = {**st.session_state.respostas_br_validado, **resultados_dimensoes}
+            # Cria o dicionário de respostas a partir do estado da sessão
+            respostas_para_salvar = {key: st.session_state[key] for key in todas_as_chaves}
+            
+            resultados_dimensoes = motor.calcular_dimensoes(respostas_para_salvar)
+            dados_completos = {**respostas_para_salvar, **resultados_dimensoes}
+            
             if salvar_dados(dados_completos):
-                st.session_state.respostas_br_validado.clear()
+                # Limpa o estado da sessão para o próximo utilizador
+                for key in todas_as_chaves:
+                    del st.session_state[key]
                 st.balloons()
                 st.success("✅ Respostas enviadas com sucesso. Muito obrigado!")
                 st.rerun()
