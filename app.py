@@ -33,18 +33,15 @@ def carregar_dados_completos(_gc):
         
         todos_os_valores = worksheet.get_all_values()
         
-        if len(todos_os_valores) < 1: # Se a planilha estiver vazia
+        if len(todos_os_valores) < 1:
             return pd.DataFrame()
 
-        # Decide se ignora a primeira linha (se parecer um cabeçalho)
-        # Por segurança, vamos sempre ignorar e aplicar o nosso.
         dados = todos_os_valores[1:] if len(todos_os_valores) > 1 else todos_os_valores
 
-        # Define o cabeçalho completo e correto aqui no código.
-        cabecalhos_respostas = list(motor.definicao_dimensoes.keys()) # Usa as chaves do motor
-        cabecalho_correto = ["Timestamp"] + [f"Q{i+1}" for i in range(32)] + list(motor.definicao_dimensoes.keys())
+        cabecalhos_respostas = [f"Q{i+1}" for i in range(32)]
+        cabecalhos_dimensoes = list(motor.definicao_dimensoes.keys())
+        cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_dimensoes
         
-        # Pega o número de colunas da primeira linha de dados para evitar erros.
         num_cols_data = len(dados[0]) if dados else 0
         cabecalho_para_usar = cabecalho_correto[:num_cols_data]
         
@@ -65,10 +62,7 @@ def carregar_dados_completos(_gc):
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
 # ==============================================================================
 def pagina_do_questionario():
-    # ... (código do questionário permanece o mesmo)
-    if 'respostas_br_validado' not in st.session_state:
-        st.session_state.respostas_br_validado = {}
-
+    
     def salvar_dados(dados_para_salvar):
         try:
             gc = conectar_gsheet()
@@ -104,8 +98,21 @@ def pagina_do_questionario():
             st.session_state[key] = None
 
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
+    
+    # --- BLOCO DE INSTRUÇÕES COMPLETO ---
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
-        st.markdown("""...""") # Instruções omitidas
+        st.markdown("""
+        **Prezado(a) Colaborador(a),**
+
+        Bem-vindo(a)! A sua participação é um passo fundamental para construirmos, juntos, um ambiente de trabalho mais saudável.
+
+        - **Confidencialidade:** As suas respostas são **100% confidenciais e anónimas**. Os resultados são sempre analisados de forma agrupada.
+        - **Sinceridade:** Por favor, responda com base nas suas experiências de trabalho das **últimas 4 semanas**. Não há respostas "certas" ou "erradas".
+        - **Como Navegar:** A pesquisa está dividida em **5 seções (abas)**, como pode ver abaixo. Por favor, navegue por todas elas para responder às perguntas.
+        - **Finalização:** O botão para enviar as suas respostas só aparecerá quando a barra de progresso atingir 100%.
+        
+        A sua contribuição é extremamente valiosa. Muito obrigado!
+        """)
     st.divider()
 
     perguntas_respondidas = len([key for key in todas_as_chaves if st.session_state[key] is not None])
@@ -139,6 +146,7 @@ def pagina_do_questionario():
                     st.rerun()
     else:
         st.warning("Por favor, navegue por todas as abas e responda às perguntas restantes.")
+
 
 # ==============================================================================
 # --- PÁGINA 2: PAINEL DO ADMINISTRADOR ---
@@ -196,7 +204,7 @@ def pagina_do_administrador():
     st.subheader("Média Geral por Dimensão (0-100)")
     if not df_medias.empty:
         st.dataframe(df_medias.style.format({'Pontuação Média': "{:.2f}"}), use_container_width=True)
-        # Gráfico omitido por brevidade, mas a lógica seria a mesma do outro projeto
+        # Gráfico omitido por brevidade
 
 # ==============================================================================
 # --- ROTEADOR PRINCIPAL DA APLICAÇÃO ---
