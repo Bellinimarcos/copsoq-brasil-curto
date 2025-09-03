@@ -7,39 +7,42 @@ pontuacao_map = {
     "Às vezes": 50,
     "Frequentemente": 75,
     "Sempre": 100,
+    # Adicionar outras escalas se necessário, ex: para a pergunta de Saúde Geral
+    "Muito ruim": 0, "Ruim": 25, "Razoável": 50, "Boa": 75, "Muito boa": 100,
     None: None
 }
 
-# Definição das 22 dimensões e quais perguntas pertencem a cada uma
+# Definição das dimensões e quais perguntas pertencem a cada uma,
+# conforme a versão curta validada para o Brasil.
 definicao_dimensoes = {
-    "1. Exigências Cognitivas": ["Q1", "Q2", "Q3"],
-    "2. Exigências Emocionais": ["Q4", "Q5"],
-    "3. Ritmo de Trabalho": ["Q6", "Q7"],
-    "4. Influência no Trabalho": ["Q8", "Q9"],
-    "5. Possibilidades de Desenvolvimento": ["Q10", "Q11"],
-    "6. Sentido do Trabalho": ["Q12", "Q13"],
-    "7. Previsibilidade": ["Q14", "Q15"],
-    "8. Clareza de Papéis": ["Q16", "Q17"],
-    "9. Reconhecimento": ["Q18", "Q19"],
-    "10. Apoio Social dos Colegas": ["Q20", "Q21"],
-    "11. Apoio Social da Liderança": ["Q22", "Q23"],
-    "12. Qualidade da Liderança": ["Q24", "Q25"],
-    "13. Justiça Organizacional": ["Q26", "Q27"],
-    "14. Confiança Vertical": ["Q28", "Q29"],
-    "15. Comunidade no Local de Trabalho": ["Q30", "Q31"],
-    "16. Segurança no Trabalho": ["Q32", "Q33"],
-    "17. Comportamentos Ofensivos": ["Q34", "Q35"],
-    "18. Estresse": ["Q36", "Q37"],
-    "19. Sintomas Físicos": ["Q38", "Q39"],
-    "20. Problemas de Sono": ["Q40", "Q41"],
-    "21. Satisfação no Trabalho": ["Q42", "Q43"],
-    "22. Engajamento no Trabalho": ["Q44", "Q45"]
+    "Ritmo de Trabalho": ["Q1", "Q2"],
+    "Exigências Cognitivas": ["Q3", "Q4"],
+    "Exigências Emocionais": ["Q5", "Q6"],
+    "Influência": ["Q7", "Q8"],
+    "Possibilidades de Desenvolvimento": ["Q9", "Q10"],
+    "Sentido do Trabalho": ["Q11", "Q12"],
+    "Comprometimento com o Local de Trabalho": ["Q13", "Q14"],
+    "Previsibilidade": ["Q15", "Q16"],
+    "Clareza de Papel": ["Q17"],
+    "Conflito de Papel": ["Q18"],
+    "Qualidade da Liderança": ["Q19", "Q20"],
+    "Apoio Social do Superior": ["Q21"],
+    "Apoio Social dos Colegas": ["Q22"],
+    "Sentido de Comunidade": ["Q23"],
+    "Insegurança no Emprego": ["Q24"],
+    "Conflito Trabalho-Família": ["Q25"],
+    "Satisfação no Trabalho": ["Q26"],
+    "Saúde em Geral": ["Q27"],
+    "Burnout": ["Q28"],
+    "Estresse": ["Q29"],
+    "Problemas de Sono": ["Q30"],
+    "Sintomas Depressivos": ["Q31"],
+    "Assédio Moral": ["Q32"],
 }
-# OBS: O número de perguntas no esqueleto original era 45. Ajustei a numeração das chaves (Q1 a Q45) para corresponder.
 
 def calcular_dimensoes(respostas_usuario):
     """
-    Calcula a pontuação média para cada dimensão do COPSOQ.
+    Calcula a pontuação média para cada dimensão do COPSOQ II (Versão Curta BR).
     'respostas_usuario' é um dicionário com chaves 'Q1', 'Q2', etc.
     """
     resultados_finais = {}
@@ -57,3 +60,4 @@ def calcular_dimensoes(respostas_usuario):
             resultados_finais[nome_dimensao] = None
             
     return resultados_finais
+
