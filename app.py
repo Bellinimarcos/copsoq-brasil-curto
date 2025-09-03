@@ -92,7 +92,18 @@ def pagina_do_questionario():
 
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
-        st.markdown("""...""") # Instruções omitidas por brevidade
+        st.markdown("""
+        **Prezado(a) Colaborador(a),**
+
+        Bem-vindo(a)! A sua participação é um passo fundamental para construirmos, juntos, um ambiente de trabalho mais saudável.
+
+        - **Confidencialidade:** As suas respostas são **100% confidenciais e anónimas**. Os resultados são sempre analisados de forma agrupada.
+        - **Sinceridade:** Por favor, responda com base nas suas experiências de trabalho das **últimas 4 semanas**. Não há respostas "certas" ou "erradas".
+        - **Como Navegar:** A pesquisa está dividida em **5 seções (abas)**, como pode ver abaixo. Por favor, navegue por todas elas para responder às perguntas.
+        - **Finalização:** O botão para enviar as suas respostas só aparecerá quando a barra de progresso atingir 100%.
+        
+        A sua contribuição é extremamente valiosa. Muito obrigado!
+        """)
     st.divider()
 
     perguntas_respondidas = len([key for key in todas_as_chaves if st.session_state[key] is not None])
