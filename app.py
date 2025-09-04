@@ -208,6 +208,7 @@ def pagina_do_administrador():
         fig.update_layout(yaxis={'categoryorder':'total ascending'}, height=700, xaxis_title="Pontuação Média (0-100)", yaxis_title="")
         st.plotly_chart(fig, use_container_width=True)
 
+    # --- SECÇÃO DE RELATÓRIOS E EXPORTAÇÃO ---
     st.divider()
     st.header("📄 Gerar Relatório e Exportar Dados")
     col1, col2 = st.columns(2)
