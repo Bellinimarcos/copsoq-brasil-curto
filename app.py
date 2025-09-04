@@ -89,7 +89,7 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # ✅ CORREÇÃO APLICADA: Retorna o output diretamente em formato binário, sem o .encode()
+    # ✅ CORREÇÃO APLICADA: Retorna o output diretamente em formato binário (bytes), como sugerido.
     return pdf.output()
 
 # ==============================================================================
