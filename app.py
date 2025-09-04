@@ -33,11 +33,14 @@ def carregar_dados_completos(_gc):
         
         todos_os_valores = worksheet.get_all_values()
         
+        # Se houver menos de 2 linhas (só cabeçalho corrompido ou vazio), não há dados.
         if len(todos_os_valores) < 2:
             return pd.DataFrame()
 
+        # Pega apenas as linhas de dados, ignorando o cabeçalho da planilha.
         dados = todos_os_valores[1:]
 
+        # Define o cabeçalho completo e correto aqui no código.
         cabecalhos_respostas = [f"Q{i+1}" for i in range(32)]
         cabecalhos_dimensoes = list(motor.definicao_dimensoes.keys())
         cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_dimensoes
@@ -71,7 +74,6 @@ class PDF(FPDF):
 def gerar_relatorio_pdf(df_medias, total_respostas):
     pdf = PDF()
     pdf.add_page()
-    pdf.set_font('Arial', '', 12)
     pdf.set_font('Arial', 'B', 14)
     pdf.cell(0, 10, 'Sumário dos Resultados', 0, 1, 'L')
     pdf.set_font('Arial', '', 12)
@@ -91,8 +93,8 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # CORREÇÃO: Retorna o output diretamente em bytes, que é o formato esperado pelo st.download_button
-    return pdf.output()
+    # ✅ CORREÇÃO: Retorna o conteúdo como bytes, o formato correto para download.
+    return pdf.output(dest='S').encode('latin-1')
 
 # ==============================================================================
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
@@ -212,16 +214,14 @@ def pagina_do_administrador():
     st.header("📄 Gerar Relatório e Exportar Dados")
     col1, col2 = st.columns(2)
     with col1:
-        # A lógica do botão de download é colocada dentro do if para garantir que `pdf_bytes` existe
         if not df_medias.empty:
-            if st.button("Gerar Relatório PDF", type="primary"):
-                pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
-                st.download_button(
-                    label="Descarregar Relatório (.pdf)", 
-                    data=pdf_bytes, 
-                    file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
-                    mime='application/pdf'
-                )
+            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
+            st.download_button(
+                label="Descarregar Relatório (.pdf)", 
+                data=pdf_bytes, 
+                file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
+                mime='application/pdf'
+            )
     with col2:
         if not df.empty:
             csv = df.to_csv(index=False).encode('utf-8')
