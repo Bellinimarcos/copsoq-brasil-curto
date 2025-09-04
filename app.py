@@ -85,13 +85,14 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
     pdf.cell(col_width_pontuacao, 10, 'Pontuação Média', 1, 1, 'C')
     pdf.set_font('Arial', '', 10)
     for index, row in df_medias.iterrows():
-        # Adiciona suporte a caracteres especiais no PDF
         pdf.cell(col_width_dimensao, 8, row['Dimensão'].encode('latin-1', 'replace').decode('latin-1'), 1, 0)
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # ✅ CORREÇÃO APLICADA: Retorna o conteúdo como bytes, o formato correto para download.
-    return pdf.output(dest='S').encode('latin-1')
+    # ✅ CORREÇÃO APLICADA: Usa um buffer de memória para gerar os bytes do PDF de forma segura.
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    return buffer.getvalue()
 
 # ==============================================================================
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
@@ -212,15 +213,13 @@ def pagina_do_administrador():
     col1, col2 = st.columns(2)
     with col1:
         if not df_medias.empty:
-            # A lógica do botão de download é colocada dentro do if para garantir que `pdf_bytes` existe
-            if st.button("Gerar Relatório PDF", type="primary"):
-                pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
-                st.download_button(
-                    label="Descarregar Relatório (.pdf)", 
-                    data=pdf_bytes, 
-                    file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
-                    mime='application/pdf'
-                )
+            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
+            st.download_button(
+                label="Descarregar Relatório (.pdf)", 
+                data=pdf_bytes, 
+                file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
+                mime='application/pdf'
+            )
     with col2:
         if not df.empty:
             csv = df.to_csv(index=False).encode('utf-8')
