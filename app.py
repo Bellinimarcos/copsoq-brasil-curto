@@ -23,16 +23,36 @@ def conectar_gsheet():
 
 @st.cache_data(ttl=60)
 def carregar_dados_completos(_gc):
-    """Carrega todos os dados da planilha de forma robusta."""
+    """
+    Carrega todos os dados da planilha de forma robusta, ignorando o cabeçalho da planilha
+    e aplicando um cabeçalho correto internamente.
+    """
     try:
         spreadsheet = _gc.open(NOME_DA_PLANILHA)
         worksheet = spreadsheet.sheet1
-        dados = worksheet.get_all_records()
-        if not dados:
+        
+        todos_os_valores = worksheet.get_all_values()
+        
+        # Se houver menos de 2 linhas (só cabeçalho corrompido ou vazio), não há dados.
+        if len(todos_os_valores) < 2:
             return pd.DataFrame()
-        df = pd.DataFrame(dados)
-        df = df.loc[:, (df.columns != '')]
+
+        # Pega apenas as linhas de dados, ignorando o cabeçalho da planilha.
+        dados = todos_os_valores[1:]
+
+        # Define o cabeçalho completo e correto aqui no código.
+        cabecalhos_respostas = [f"Q{i+1}" for i in range(32)]
+        cabecalhos_dimensoes = list(motor.definicao_dimensoes.keys())
+        cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_dimensoes
+        
+        # Cria o DataFrame, garantindo que o número de colunas corresponda.
+        num_cols_data = len(dados[0]) if dados else 0
+        cabecalho_para_usar = cabecalho_correto[:num_cols_data]
+        
+        df = pd.DataFrame(dados, columns=cabecalho_para_usar)
+        
         return df
+        
     except gspread.exceptions.SpreadsheetNotFound:
         st.error(f"Erro Crítico: A planilha '{NOME_DA_PLANILHA}' não foi encontrada.")
         return pd.DataFrame()
@@ -115,7 +135,7 @@ def pagina_do_questionario():
         if key not in st.session_state: st.session_state[key] = None
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
-        st.markdown("""**Prezado(a) Colaborador(a),**...""") # Instruções omitidas
+        st.markdown("""...""") # Instruções omitidas
     st.divider()
     perguntas_respondidas = len([key for key in todas_as_chaves if st.session_state[key] is not None])
     progresso = perguntas_respondidas / total_perguntas if total_perguntas > 0 else 0
