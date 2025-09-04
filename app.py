@@ -212,13 +212,15 @@ def pagina_do_administrador():
     col1, col2 = st.columns(2)
     with col1:
         if not df_medias.empty:
-            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
-            st.download_button(
-                label="Descarregar Relatório (.pdf)", 
-                data=pdf_bytes, 
-                file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
-                mime='application/pdf'
-            )
+            # A lógica do botão de download é colocada dentro do if para garantir que `pdf_bytes` existe
+            if st.button("Gerar Relatório PDF", type="primary"):
+                pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
+                st.download_button(
+                    label="Descarregar Relatório (.pdf)", 
+                    data=pdf_bytes, 
+                    file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
+                    mime='application/pdf'
+                )
     with col2:
         if not df.empty:
             csv = df.to_csv(index=False).encode('utf-8')
