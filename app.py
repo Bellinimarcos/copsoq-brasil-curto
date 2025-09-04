@@ -89,7 +89,8 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
     pdf.cell(col_width_pontuacao, 10, 'Pontuação Média', 1, 1, 'C')
     pdf.set_font('Arial', '', 10)
     for index, row in df_medias.iterrows():
-        pdf.cell(col_width_dimensao, 8, row['Dimensão'], 1, 0)
+        # Adiciona suporte a caracteres especiais no PDF
+        pdf.cell(col_width_dimensao, 8, row['Dimensão'].encode('latin-1', 'replace').decode('latin-1'), 1, 0)
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
@@ -216,8 +217,8 @@ def pagina_do_administrador():
     with col1:
         if st.button("Gerar Relatório PDF", type="primary"):
             # A variável 'fig' só existe se df_medias não for vazia
-            if 'fig' in locals():
-                pdf_bytes = gerar_relatorio_pdf(df_medias, fig, total_respostas)
+            if not df_medias.empty:
+                pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
                 st.download_button(label="Descarregar Relatório (.pdf)", data=pdf_bytes, file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', mime='application/pdf')
     with col2:
         csv = df.to_csv(index=False).encode('utf-8')
