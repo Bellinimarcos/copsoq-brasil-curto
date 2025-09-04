@@ -33,6 +33,7 @@ def carregar_dados_completos(_gc):
         
         todos_os_valores = worksheet.get_all_values()
         
+        # Se houver menos de 2 linhas (só cabeçalho corrompido ou vazio), não há dados.
         if len(todos_os_valores) < 2:
             return pd.DataFrame()
 
@@ -70,7 +71,7 @@ class PDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
-def gerar_relatorio_pdf(df_medias, fig, total_respostas):
+def gerar_relatorio_pdf(df_medias, total_respostas):
     pdf = PDF()
     pdf.add_page()
     pdf.set_font('Arial', '', 12)
@@ -91,15 +92,9 @@ def gerar_relatorio_pdf(df_medias, fig, total_respostas):
         pdf.cell(col_width_dimensao, 8, row['Dimensão'], 1, 0)
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
-    try:
-        img_bytes = fig.to_image(format="png", width=800, height=800, scale=2)
-        pdf.add_page(orientation='P')
-        pdf.set_font('Arial', 'B', 12)
-        pdf.cell(0, 10, 'Gráfico de Resultados', 0, 1, 'L')
-        pdf.image(io.BytesIO(img_bytes), x = 10, y = None, w = 190)
-    except Exception as e:
-        st.warning(f"Não foi possível gerar a imagem do gráfico para o PDF: {e}")
-    return pdf.output(dest='S').encode('latin-1')
+    
+    # CORREÇÃO: Retorna o output diretamente em bytes, sem .encode()
+    return pdf.output()
 
 # ==============================================================================
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
@@ -220,6 +215,7 @@ def pagina_do_administrador():
     col1, col2 = st.columns(2)
     with col1:
         if st.button("Gerar Relatório PDF", type="primary"):
+            # A variável 'fig' só existe se df_medias não for vazia
             if 'fig' in locals():
                 pdf_bytes = gerar_relatorio_pdf(df_medias, fig, total_respostas)
                 st.download_button(label="Descarregar Relatório (.pdf)", data=pdf_bytes, file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', mime='application/pdf')
