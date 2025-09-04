@@ -90,7 +90,7 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # ✅ CORREÇÃO: Retorna o conteúdo como bytes, o formato correto para download.
+    # ✅ CORREÇÃO APLICADA: Retorna o conteúdo como bytes, o formato correto para download.
     return pdf.output(dest='S').encode('latin-1')
 
 # ==============================================================================
