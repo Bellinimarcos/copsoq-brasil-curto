@@ -34,19 +34,15 @@ def carregar_dados_completos(_gc):
         
         todos_os_valores = worksheet.get_all_values()
         
-        # Se houver menos de 2 linhas (só cabeçalho ou vazio), não há dados.
         if len(todos_os_valores) < 2:
             return pd.DataFrame()
 
-        # Pega apenas as linhas de dados, ignorando o cabeçalho da planilha.
         dados = todos_os_valores[1:]
 
-        # Define o cabeçalho completo e correto aqui no código.
         cabecalhos_respostas = [f"Resp_Q{i}" for i in range(1, 85)]
         cabecalhos_escalas = list(motor.definicao_escalas.keys())
         cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_escalas
         
-        # Cria o DataFrame, garantindo que o número de colunas corresponda.
         num_cols_data = len(dados[0])
         cabecalho_para_usar = cabecalho_correto[:num_cols_data]
         
@@ -74,32 +70,27 @@ class PDF(FPDF):
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
 def gerar_relatorio_pdf(df_medias, fig, total_respostas):
+    # ... (código de geração de PDF permanece o mesmo)
     pdf = PDF()
     pdf.add_page()
     pdf.set_font('Arial', '', 12)
-
     pdf.set_font('Arial', 'B', 14)
     pdf.cell(0, 10, 'Sumário dos Resultados', 0, 1, 'L')
     pdf.set_font('Arial', '', 12)
     pdf.multi_cell(0, 10, f"Este relatório apresenta a média consolidada dos resultados do questionário COPSOQ III, com base num total de {total_respostas} respostas recolhidas.")
     pdf.ln(10)
-
     pdf.set_font('Arial', 'B', 12)
     pdf.cell(0, 10, 'Tabela de Pontuações Médias por Escala', 0, 1, 'L')
     pdf.set_font('Arial', 'B', 10)
-    
     col_width_escala = 130
     col_width_pontuacao = 40
-    
     pdf.cell(col_width_escala, 10, 'Escala', 1, 0, 'C')
     pdf.cell(col_width_pontuacao, 10, 'Pontuação Média', 1, 1, 'C')
-    
     pdf.set_font('Arial', '', 10)
     for index, row in df_medias.iterrows():
         pdf.cell(col_width_escala, 8, row['Escala'], 1, 0)
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
-    
     try:
         img_bytes = fig.to_image(format="png", width=800, height=1000, scale=2)
         pdf.add_page(orientation='P')
@@ -108,7 +99,6 @@ def gerar_relatorio_pdf(df_medias, fig, total_respostas):
         pdf.image(io.BytesIO(img_bytes), x = 10, y = None, w = 190)
     except Exception as e:
         st.warning(f"Não foi possível gerar a imagem do gráfico para o PDF: {e}")
-
     return pdf.output(dest='S').encode('latin-1')
 
 
@@ -116,11 +106,26 @@ def gerar_relatorio_pdf(df_medias, fig, total_respostas):
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
 # ==============================================================================
 def pagina_do_questionario():
-    # ... O código do questionário com navegação por botões ...
     if 'respostas' not in st.session_state:
         st.session_state.respostas = {str(i): None for i in range(1, 85)}
     if 'passo_atual' not in st.session_state:
         st.session_state.passo_atual = 0
+
+    def salvar_dados(lista_de_dados):
+        try:
+            gc = conectar_gsheet()
+            spreadsheet = gc.open(NOME_DA_SUA_PLANILHA)
+            worksheet = spreadsheet.sheet1
+            if not worksheet.get_all_values():
+                cabecalhos_respostas = [f"Resp_Q{i}" for i in range(1, 85)]
+                cabecalhos_escalas = list(motor.definicao_escalas.keys())
+                cabecalho_completo = ["Timestamp"] + cabecalhos_respostas + cabecalhos_escalas
+                worksheet.update('A1', [cabecalho_completo])
+            worksheet.append_row(lista_de_dados)
+            return True
+        except Exception as e:
+            st.error(f"Ocorreu um erro ao salvar na planilha: {e}")
+            return False
 
     def obter_cor_e_significado(nome_escala, valor):
         if valor is None: return "#6c757d", "N/A"
@@ -155,8 +160,20 @@ def pagina_do_questionario():
     total_perguntas = sum(len(p) for p in perguntas_agrupadas.values())
 
     st.title("Diagnóstico de Riscos Psicossociais (COPSOQ III)")
+    # --- BLOCO DE INSTRUÇÕES COMPLETO ---
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
-        st.markdown("""...""") # Instruções omitidas
+        st.markdown("""
+        **Prezado(a) Colaborador(a),**
+
+        Bem-vindo(a)! A sua participação é um passo fundamental para construirmos, juntos, um ambiente de trabalho mais saudável.
+
+        - **Confidencialidade:** As suas respostas são **100% confidenciais e anónimas**. Os resultados são sempre analisados de forma agrupada.
+        - **Sinceridade:** Por favor, responda com base nas suas experiências de trabalho das **últimas 4 semanas**. Não há respostas "certas" ou "erradas".
+        - **Como Navegar:** A pesquisa está dividida em **8 secções**. Use os botões "Anterior" e "Próximo" para navegar entre elas.
+        - **Finalização:** O botão para finalizar e ver o seu diagnóstico só aparecerá na última página, quando todas as perguntas tiverem sido respondidas.
+        
+        A sua contribuição é extremamente valiosa. Muito obrigado!
+        """)
 
     perguntas_respondidas = len([r for r in st.session_state.respostas.values() if r is not None])
     progresso = perguntas_respondidas / total_perguntas if total_perguntas > 0 else 0
@@ -196,8 +213,38 @@ def pagina_do_questionario():
 
     if progresso == 1.0:
         st.success("🎉 **Excelente! Você respondeu a todas as perguntas.**")
+        # --- BLOCO DE CÓDIGO CORRIGIDO ---
         if st.button("Finalizar e Ver Meu Diagnóstico", type="primary", use_container_width=True):
-            # ... (Lógica de salvar e mostrar resultados) ...
+            with st.spinner('A analisar as suas respostas...'):
+                respostas_ordenadas = [st.session_state.respostas.get(str(i)) for i in range(1, total_perguntas + 1)]
+                pontuacoes = motor.calcular_pontuacoes(respostas_ordenadas)
+                resultados = motor.calcular_escalas_finais(pontuacoes)
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                nomes_escalas_ordenadas = list(motor.definicao_escalas.keys())
+                resultados_ordenados = [resultados.get(nome, "") for nome in nomes_escalas_ordenadas]
+                linha_para_salvar = [timestamp] + respostas_ordenadas + resultados_ordenados
+                
+                if salvar_dados(linha_para_salvar):
+                    st.balloons()
+                    st.success("Diagnóstico concluído e dados salvos anonimamente!")
+                    st.subheader("O Seu Diagnóstico Psicossocial:")
+                    col_res1, col_res2, col_res3 = st.columns(3)
+                    cols_resultado = [col_res1, col_res2, col_res3]
+                    col_index = 0
+                    for nome, valor in resultados.items():
+                        with cols_resultado[col_index]:
+                            cor, texto_valor = obter_cor_e_significado(nome, valor)
+                            st.markdown(f"""
+                            <div style="background-color:{cor}; padding:15px; border-radius:10px; margin:5px; height: 160px; display: flex; flex-direction: column; justify-content: center; text-align: center;">
+                                <h3 style="color:white; font-size: 16px; font-weight: bold; margin-bottom: 10px;">{nome}</h3>
+                                <p style="color:white; font-size: 22px; font-weight: bold; margin-top: 5px;">{texto_valor}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        col_index = (col_index + 1) % 3
+                    st.info("Pode fechar esta janela.")
+    else:
+        if st.session_state.passo_atual == len(lista_de_temas) - 1:
+            st.warning("Ainda faltam perguntas nas secções anteriores. Por favor, volte e responda a todas para habilitar o botão de finalização.")
 
 
 # ==============================================================================
@@ -255,14 +302,7 @@ def pagina_do_administrador():
     df_medias = medias.reset_index()
     df_medias.columns = ['Escala', 'Pontuação Média']
 
-    fig = px.bar(
-        df_medias,
-        x='Pontuação Média',
-        y='Escala',
-        orientation='h',
-        title='Pontuação Média para Cada Escala do COPSOQ III',
-        text='Pontuação Média'
-    )
+    fig = px.bar(df_medias, x='Pontuação Média', y='Escala', orientation='h', title='Pontuação Média para Cada Escala do COPSOQ III', text='Pontuação Média')
     fig.update_layout(yaxis={'categoryorder':'total ascending'}, height=800, xaxis_title="Pontuação Média (0-100)", yaxis_title="")
     fig.update_traces(texttemplate='%{text:.2f}', textposition='outside')
     
