@@ -102,7 +102,10 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    return pdf.output()
+    # ✅ CORREÇÃO APLICADA: Usa um buffer de memória para gerar os bytes do PDF de forma segura.
+    buffer = io.BytesIO()
+    pdf.output(buffer)
+    return buffer.getvalue()
 
 # ==============================================================================
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
@@ -135,7 +138,6 @@ def pagina_do_questionario():
 
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
     
-    # --- BLOCO DE INSTRUÇÕES COMPLETO ---
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
         st.markdown("""
         **Prezado(a) Colaborador(a),**
@@ -144,7 +146,7 @@ def pagina_do_questionario():
 
         - **Confidencialidade:** As suas respostas são **100% confidenciais e anónimas**. Os resultados são sempre analisados de forma agrupada.
         - **Sinceridade:** Por favor, responda com base nas suas experiências de trabalho das **últimas 4 semanas**. Não há respostas "certas" ou "erradas".
-        - **Como Navegar:** A pesquisa está dividida em **5 seções (abas)**, como pode ver abaixo. Por favor, navegue por todas elas para responder às perguntas.
+        - **Como Navegar:** A pesquisa está dividida em **5 seções (abas)**. Por favor, navegue por todas elas para responder às perguntas.
         - **Finalização:** O botão para enviar as suas respostas só aparecerá quando a barra de progresso atingir 100%.
         
         A sua contribuição é extremamente valiosa. Muito obrigado!
