@@ -88,6 +88,8 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_dimensao, 8, row['Dimensão'].encode('latin-1', 'replace').decode('latin-1'), 1, 0)
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
+
+    # ✅ CORREÇÃO APLICADA: Retorna o output diretamente em bytes, que é o formato esperado pelo st.download_button
     return pdf.output()
 
 # ==============================================================================
