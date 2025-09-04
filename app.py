@@ -33,14 +33,11 @@ def carregar_dados_completos(_gc):
         
         todos_os_valores = worksheet.get_all_values()
         
-        # Se houver menos de 2 linhas (só cabeçalho corrompido ou vazio), não há dados.
         if len(todos_os_valores) < 2:
             return pd.DataFrame()
 
-        # Pega apenas as linhas de dados, ignorando o cabeçalho da planilha.
         dados = todos_os_valores[1:]
 
-        # Define o cabeçalho completo e correto aqui no código.
         cabecalhos_respostas = [f"Q{i+1}" for i in range(32)]
         cabecalhos_dimensoes = list(motor.definicao_dimensoes.keys())
         cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_dimensoes
