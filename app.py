@@ -59,23 +59,19 @@ def carregar_dados_completos(_gc):
         st.error(f"Ocorreu um erro inesperado ao carregar os dados: {e}")
         return pd.DataFrame()
 
-# --- MODIFICAÇÃO: FUNÇÃO DE GERAÇÃO DE PDF COM LOGO ---
+# --- FUNÇÃO DE GERAÇÃO DE PDF COM LOGO ---
 
-# NOVA FUNÇÃO: Para baixar o logo de uma URL e salvar temporariamente
 def baixar_logo(url):
     """Baixa uma imagem de uma URL e a salva como um arquivo temporário."""
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
-        response = requests.get(url, headers=headers, stream=True)
-        response.raise_for_status() # Lança um erro para status ruins (4xx ou 5xx)
+        response = requests.get(url, headers=headers, stream=True, timeout=10)
+        response.raise_for_status() 
         
-        # Usa BytesIO para manipular a imagem em memória
         img_buffer = io.BytesIO(response.content)
         
-        # Abre com PIL para validar e pegar o formato
         img = Image.open(img_buffer)
         
-        # Salva temporariamente para o FPDF usar
         temp_path = "logo_temp.png" 
         img.save(temp_path)
         
@@ -93,31 +89,24 @@ class PDF(FPDF):
         self.logo_path = logo_path
 
     def header(self):
-        # ADIÇÃO: Lógica para adicionar o logo se ele existir
         if self.logo_path and os.path.exists(self.logo_path):
             try:
-                # Adiciona o logo mantendo a proporção, com 8mm de altura máxima
                 self.image(self.logo_path, 10, 8, h=12) 
             except Exception as e:
-                # Se houver erro ao adicionar a imagem, ele não quebra a geração do PDF
                 pass
         else:
-            # Se não houver logo, usa o cabeçalho de texto original
             self.set_font('Arial', 'B', 16)
-            self.set_text_color(0, 51, 102)  # Azul escuro
+            self.set_text_color(0, 51, 102)
             self.cell(0, 10, 'IPSI', 0, 0, 'L')
             self.ln(5)
             self.set_font('Arial', 'I', 10)
-            self.set_text_color(102, 102, 102)  # Cinza
+            self.set_text_color(102, 102, 102)
             self.cell(0, 10, 'Consultoria em Saúde Organizacional', 0, 1, 'L')
         
-        # Linha divisória
         self.set_line_width(0.5)
         self.set_draw_color(0, 51, 102)
         self.line(10, 25, 200, 25)
-        
         self.ln(10)
-        
         self.set_font('Arial', 'B', 12)
         self.set_text_color(0, 0, 0)
         self.cell(0, 10, 'Relatório de Diagnóstico Psicossocial - COPSOQ II (Versão Curta - Brasil)', 0, 1, 'C')
@@ -128,7 +117,6 @@ class PDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
-# MODIFICADO: Agora aceita uma URL de logo como parâmetro
 def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
     logo_path = None
     if logo_url:
@@ -157,7 +145,6 @@ def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
     buffer = io.BytesIO()
     pdf.output(buffer)
     
-    # Limpa o arquivo de logo temporário após o uso
     if logo_path and os.path.exists(logo_path):
         os.remove(logo_path)
         
@@ -167,6 +154,7 @@ def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
 # --- PÁGINA 1: QUESTIONÁRIO PÚBLICO (SEM ALTERAÇÕES) ---
 # ==============================================================================
 def pagina_do_questionario():
+    # O código desta função permanece inalterado
     def salvar_dados(dados_para_salvar):
         try:
             gc = conectar_gsheet()
@@ -242,7 +230,7 @@ def pagina_do_questionario():
 
 
 # ==============================================================================
-# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (TOTALMENTE REFORMULADO) ---
+# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (COM A CORREÇÃO DE MEMÓRIA) ---
 # ==============================================================================
 def pagina_do_administrador():
     st.title("🔑 Painel do Consultor")
@@ -254,7 +242,6 @@ def pagina_do_administrador():
         st.error("A senha de administrador não foi configurada na secção [admin] dos 'Secrets'.")
         return
 
-    # Layout de login
     if 'autenticado' not in st.session_state:
         st.session_state.autenticado = False
 
@@ -269,7 +256,6 @@ def pagina_do_administrador():
                 st.error("Senha incorreta.")
         return
 
-    # --- Se autenticado, mostra o painel ---
     st.success("Acesso garantido!")
     st.divider()
 
@@ -284,7 +270,6 @@ def pagina_do_administrador():
     st.metric("Total de Respostas Recebidas", f"{total_respostas}")
     st.divider()
 
-    # --- SEÇÃO DE ANÁLISE ---
     st.header("📊 Análise Geral dos Resultados")
     
     nomes_dimensoes = list(motor.definicao_dimensoes.keys())
@@ -308,9 +293,9 @@ def pagina_do_administrador():
     
     def estilo_semaforo(row):
         valor = row['Pontuação Média']
-        if valor <= 33.3: return ['background-color: #d4edda; color: #155724'] * 2 # Verde
-        elif valor <= 66.6: return ['background-color: #fff3cd; color: #856404'] * 2 # Amarelo
-        else: return ['background-color: #f8d7da; color: #721c24'] * 2 # Vermelho
+        if valor <= 33.3: return ['background-color: #d4edda; color: #155724'] * 2
+        elif valor <= 66.6: return ['background-color: #fff3cd; color: #856404'] * 2
+        else: return ['background-color: #f8d7da; color: #721c24'] * 2
 
     tab1, tab2 = st.tabs(["Visão Gráfica", "Tabela Detalhada"])
 
@@ -336,18 +321,26 @@ def pagina_do_administrador():
 
     st.divider()
 
-    # --- NOVA SEÇÃO DE EXPORTAÇÃO ---
     st.header("📄 Exportar Relatório e Dados")
     st.info("Para incluir um logo no relatório PDF, cole o URL da imagem no campo abaixo.")
     
-    logo_url = st.text_input("URL do Logo (opcional):", placeholder="https://exemplo.com/logo.png")
+    # ✅ MELHORIA: Usa st.session_state para "lembrar" o URL do logo
+    if 'logo_url' not in st.session_state:
+        st.session_state.logo_url = "" # Inicializa a variável na memória
+
+    # O 'key' conecta este campo de texto à variável na memória
+    st.text_input(
+        "URL do Logo (opcional):", 
+        key="logo_url", 
+        placeholder="https://exemplo.com/logo.png"
+    )
     
     col1, col2 = st.columns(2)
     
     with col1:
         if not df_medias.empty:
-            # Passa a URL do logo para a função de gerar PDF
-            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas, logo_url)
+            # Usa o valor da memória (st.session_state.logo_url) para gerar o PDF
+            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas, st.session_state.logo_url)
             st.download_button(
                 label="📥 Gerar e Descarregar Relatório (.pdf)", 
                 data=pdf_bytes, 
