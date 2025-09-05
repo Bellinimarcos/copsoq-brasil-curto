@@ -138,6 +138,7 @@ def pagina_do_questionario():
 
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
     
+    # --- BLOCO DE INSTRUÇÕES COMPLETO ---
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
         st.markdown("""
         **Prezado(a) Colaborador(a),**
