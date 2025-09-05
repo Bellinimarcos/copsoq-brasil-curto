@@ -12,7 +12,7 @@ from PIL import Image
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="IPSI | Diagnóstico COPSOQ II", layout="wide")
 
-# --- FUNÇÕES GLOBAIS E DE BANCO DE DADOS (Sem alterações) ---
+# --- FUNÇÕES GLOBAIS E DE BANCO DE DADOS ---
 NOME_DA_PLANILHA = 'Resultados_COPSOQ_II_BR_Validado'
 
 @st.cache_resource(ttl=600)
@@ -26,20 +26,17 @@ def conectar_gsheet():
 @st.cache_data(ttl=60)
 def carregar_dados_completos(_gc):
     """
-    Carrega todos os dados da planilha de forma robusta, ignorando o cabeçalho da planilha
-    e aplicando um cabeçalho correto internamente.
+    Carrega todos os dados da planilha de forma robusta, com tratamento de erros aprimorado.
     """
     try:
         spreadsheet = _gc.open(NOME_DA_PLANILHA)
         worksheet = spreadsheet.sheet1
-        
         todos_os_valores = worksheet.get_all_values()
         
         if len(todos_os_valores) < 2:
             return pd.DataFrame()
 
         dados = todos_os_valores[1:]
-
         cabecalhos_respostas = [f"Q{i+1}" for i in range(32)]
         cabecalhos_dimensoes = list(motor.definicao_dimensoes.keys())
         cabecalho_correto = ["Timestamp"] + cabecalhos_respostas + cabecalhos_dimensoes
@@ -48,20 +45,26 @@ def carregar_dados_completos(_gc):
         cabecalho_para_usar = cabecalho_correto[:num_cols_data]
         
         df = pd.DataFrame(dados, columns=cabecalho_para_usar)
-        
         return df
         
     except gspread.exceptions.SpreadsheetNotFound:
-        st.error(f"Erro Crítico: A planilha '{NOME_DA_PLANILHA}' não foi encontrada.")
+        st.error(f"Erro Crítico: A planilha '{NOME_DA_PLANILHA}' não foi encontrada. Verifique o nome.")
+        return pd.DataFrame()
+    except gspread.exceptions.APIError as e:
+        st.error(
+            "Erro de Permissão ao aceder ao Google Sheets. Por favor, verifique se:"
+            f"\n1. A planilha '{NOME_DA_PLANILHA}' foi partilhada com o email de serviço: **{st.secrets['gcp_service_account']['client_email']}** com permissão de 'Editor'."
+            "\n2. Se a permissão já foi dada, tente clicar no botão 'Limpar Cache e Recarregar Dados'."
+        )
         return pd.DataFrame()
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao carregar os dados: {e}")
         return pd.DataFrame()
 
-# --- LÓGICA DE GERAÇÃO DE PDF (TOTALMENTE REFORMULADA PARA MAIOR ROBUSTEZ) ---
+# --- LÓGICA DE GERAÇÃO DE PDF ---
 
 def baixar_logo_em_memoria(url):
-    """Baixa uma imagem de uma URL e a retorna como um objeto em memória, sem salvar em disco."""
+    """Baixa uma imagem de uma URL e a retorna como um objeto em memória."""
     try:
         if not url.strip(): return None, None
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -70,14 +73,12 @@ def baixar_logo_em_memoria(url):
 
         img_buffer = io.BytesIO(response.content)
         img = Image.open(img_buffer)
-
-        # O FPDF precisa saber o formato da imagem (JPG, PNG, GIF)
+        
         img_format = img.format.upper()
         if img_format not in ['JPEG', 'PNG', 'GIF']:
             st.warning(f"Formato de imagem '{img_format}' não suportado. Use JPG, PNG ou GIF.")
             return None, None
         
-        # Garante que o "leitor" do buffer volte ao início
         img_buffer.seek(0)
         return img_buffer, img_format
         
@@ -86,7 +87,6 @@ def baixar_logo_em_memoria(url):
         return None, None
 
 class PDF(FPDF):
-    # Passamos o logo como um objeto em memória (buffer)
     def __init__(self, logo_buffer=None, logo_format=None):
         super().__init__()
         self.logo_buffer = logo_buffer
@@ -104,21 +104,16 @@ class PDF(FPDF):
 
     def header(self):
         logo_adicionado = False
-        # Tenta adicionar o logo da memória
         if self.logo_buffer and self.logo_format:
             try:
-                # O método 'image' do FPDF aceita o buffer diretamente
                 self.image(self.logo_buffer, x=10, y=8, h=12, type=self.logo_format)
                 logo_adicionado = True
             except Exception:
-                # Falha silenciosamente e usa o fallback
                 pass
         
-        # Se não conseguiu adicionar o logo, usa o texto padrão
         if not logo_adicionado:
             self.header_fallback_texto()
         
-        # O resto do cabeçalho é comum a ambos os casos
         self.set_line_width(0.5)
         self.set_draw_color(0, 51, 102)
         self.line(10, 25, 200, 25)
@@ -158,14 +153,11 @@ def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # Gera o PDF final em memória
     buffer = io.BytesIO()
     pdf.output(buffer)
     return buffer.getvalue()
 
-# ==============================================================================
-# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO (Sem alterações) ---
-# ==============================================================================
+# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
 def pagina_do_questionario():
     # O código desta função permanece inalterado
     def salvar_dados(dados_para_salvar):
@@ -241,9 +233,7 @@ def pagina_do_questionario():
     else:
         st.warning("Por favor, navegue por todas as abas e responda às perguntas restantes.")
 
-# ==============================================================================
-# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (Sem alterações na lógica da página) ---
-# ==============================================================================
+# --- PÁGINA 2: PAINEL DO ADMINISTRADOR ---
 def pagina_do_administrador():
     st.title("🔑 Painel do Consultor")
     st.markdown("Bem-vindo à área de análise de resultados do diagnóstico COPSOQ II.")
@@ -270,12 +260,20 @@ def pagina_do_administrador():
 
     st.success("Acesso garantido!")
     st.divider()
+    
+    # Botão para resolver problemas de conexão
+    st.warning("Se encontrar um erro ou os dados parecerem desatualizados, clique no botão abaixo.")
+    if st.button("🔄 Limpar Cache e Recarregar Dados"):
+        st.cache_data.clear()
+        st.cache_resource.clear()
+        st.success("Cache limpo! A recarregar a página...")
+        st.rerun()
 
     gc = conectar_gsheet()
     df = carregar_dados_completos(gc)
 
     if df.empty:
-        st.warning("Ainda não há dados para analisar.")
+        st.info("Ainda não há dados para analisar ou ocorreu uma falha na conexão. Tente limpar o cache acima.")
         return
 
     total_respostas = len(df)
@@ -370,9 +368,7 @@ def pagina_do_administrador():
                 use_container_width=True
             )
 
-# ==============================================================================
-# --- ROTEADOR PRINCIPAL DA APLICAÇÃO (Sem alterações) ---
-# ==============================================================================
+# --- ROTEADOR PRINCIPAL DA APLICAÇÃO ---
 def main():
     """Verifica a URL para decidir qual página mostrar."""
     params = st.query_params
