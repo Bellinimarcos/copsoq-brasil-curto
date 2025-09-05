@@ -7,6 +7,8 @@ import calculadora_copsoq_br as motor
 from fpdf import FPDF
 import io
 import requests
+import os
+from PIL import Image
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="IPSI | Diagnóstico COPSOQ II", layout="wide")
@@ -64,13 +66,34 @@ def carregar_dados_completos(_gc):
 class PDF(FPDF):
     def header(self):
         try:
-            response = requests.get(LOGO_URL, timeout=10)
+            # Baixa a imagem
+            response = requests.get(LOGO_URL, timeout=30)
             response.raise_for_status()
-            logo_bytes = io.BytesIO(response.content)
-            self.image(logo_bytes, x=10, y=8, w=35)
+            
+            # Processa a imagem com PIL para garantir compatibilidade
+            img = Image.open(io.BytesIO(response.content))
+            
+            # Converte para RGB se necessário
+            if img.mode in ('RGBA', 'LA', 'P'):
+                img = img.convert('RGB')
+            
+            # Salva temporariamente em disco
+            temp_logo_path = "temp_logo.jpg"
+            img.save(temp_logo_path, 'JPEG', quality=95)
+            
+            # Insere a imagem usando o caminho do arquivo
+            self.image(temp_logo_path, x=10, y=8, w=35)
             self.ln(20)
-        except Exception:
-            self.ln(10)
+            
+            # Limpeza do arquivo temporário
+            if os.path.exists(temp_logo_path):
+                os.remove(temp_logo_path)
+                
+        except Exception as e:
+            # Fallback com texto se a imagem falhar
+            self.set_font('Arial', 'B', 16)
+            self.cell(40, 10, 'IPSI', 0, 0, 'L')
+            self.ln(20)
 
         self.set_font('Arial', 'B', 12)
         self.cell(0, 10, 'Relatório de Diagnóstico Psicossocial - COPSOQ II (Versão Curta - Brasil)', 0, 1, 'C')
@@ -261,4 +284,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
