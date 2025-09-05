@@ -7,13 +7,12 @@ import calculadora_copsoq_br as motor
 from fpdf import FPDF
 import io
 import requests
-import os
 from PIL import Image
 
 # --- CONFIGURAÇÃO INICIAL ---
 st.set_page_config(page_title="IPSI | Diagnóstico COPSOQ II", layout="wide")
 
-# --- FUNÇÕES GLOBAIS E DE BANCO DE DADOS ---
+# --- FUNÇÕES GLOBAIS E DE BANCO DE DADOS (Sem alterações) ---
 NOME_DA_PLANILHA = 'Resultados_COPSOQ_II_BR_Validado'
 
 @st.cache_resource(ttl=600)
@@ -59,50 +58,67 @@ def carregar_dados_completos(_gc):
         st.error(f"Ocorreu um erro inesperado ao carregar os dados: {e}")
         return pd.DataFrame()
 
-# --- FUNÇÃO DE GERAÇÃO DE PDF COM LOGO ---
+# --- LÓGICA DE GERAÇÃO DE PDF (TOTALMENTE REFORMULADA PARA MAIOR ROBUSTEZ) ---
 
-def baixar_logo(url):
-    """Baixa uma imagem de uma URL e a salva como um arquivo temporário."""
+def baixar_logo_em_memoria(url):
+    """Baixa uma imagem de uma URL e a retorna como um objeto em memória, sem salvar em disco."""
     try:
+        if not url.strip(): return None, None
         headers = {'User-Agent': 'Mozilla/5.0'}
         response = requests.get(url, headers=headers, stream=True, timeout=10)
-        response.raise_for_status() 
-        
+        response.raise_for_status()
+
         img_buffer = io.BytesIO(response.content)
-        
         img = Image.open(img_buffer)
+
+        # O FPDF precisa saber o formato da imagem (JPG, PNG, GIF)
+        img_format = img.format.upper()
+        if img_format not in ['JPEG', 'PNG', 'GIF']:
+            st.warning(f"Formato de imagem '{img_format}' não suportado. Use JPG, PNG ou GIF.")
+            return None, None
         
-        temp_path = "logo_temp.png" 
-        img.save(temp_path)
+        # Garante que o "leitor" do buffer volte ao início
+        img_buffer.seek(0)
+        return img_buffer, img_format
         
-        return temp_path
-    except requests.exceptions.RequestException as e:
-        st.warning(f"Não foi possível baixar o logo: {e}. O PDF será gerado sem ele.")
-        return None
     except Exception as e:
-        st.warning(f"Erro ao processar a imagem do logo: {e}. O PDF será gerado sem ele.")
-        return None
+        st.warning(f"Falha ao baixar ou processar o logo: {e}. O PDF será gerado sem ele.")
+        return None, None
 
 class PDF(FPDF):
-    def __init__(self, logo_path=None):
+    # Passamos o logo como um objeto em memória (buffer)
+    def __init__(self, logo_buffer=None, logo_format=None):
         super().__init__()
-        self.logo_path = logo_path
+        self.logo_buffer = logo_buffer
+        self.logo_format = logo_format
+
+    def header_fallback_texto(self):
+        """Cabeçalho de texto padrão, usado se o logo falhar."""
+        self.set_font('Arial', 'B', 16)
+        self.set_text_color(0, 51, 102)
+        self.cell(0, 10, 'IPSI', 0, 0, 'L')
+        self.ln(5)
+        self.set_font('Arial', 'I', 10)
+        self.set_text_color(102, 102, 102)
+        self.cell(0, 10, 'Consultoria em Saúde Organizacional', 0, 1, 'L')
 
     def header(self):
-        if self.logo_path and os.path.exists(self.logo_path):
+        logo_adicionado = False
+        # Tenta adicionar o logo da memória
+        if self.logo_buffer and self.logo_format:
             try:
-                self.image(self.logo_path, 10, 8, h=12) 
-            except Exception as e:
+                # O método 'image' do FPDF aceita o buffer diretamente
+                self.image(self.logo_buffer, x=10, y=8, h=12, type=self.logo_format)
+                logo_adicionado = True
+            except Exception:
+                # Falha silenciosamente e usa o fallback
                 pass
-        else:
-            self.set_font('Arial', 'B', 16)
-            self.set_text_color(0, 51, 102)
-            self.cell(0, 10, 'IPSI', 0, 0, 'L')
-            self.ln(5)
-            self.set_font('Arial', 'I', 10)
-            self.set_text_color(102, 102, 102)
-            self.cell(0, 10, 'Consultoria em Saúde Organizacional', 0, 1, 'L')
         
+        # Se não conseguiu adicionar o logo, usa o texto padrão
+        if not logo_adicionado:
+            self.header_fallback_texto()
+        
+        # O resto do cabeçalho é comum a ambos os casos
         self.set_line_width(0.5)
         self.set_draw_color(0, 51, 102)
         self.line(10, 25, 200, 25)
@@ -118,11 +134,11 @@ class PDF(FPDF):
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
 def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
-    logo_path = None
+    logo_buffer, logo_format = None, None
     if logo_url:
-        logo_path = baixar_logo(logo_url)
+        logo_buffer, logo_format = baixar_logo_em_memoria(logo_url)
         
-    pdf = PDF(logo_path=logo_path)
+    pdf = PDF(logo_buffer=logo_buffer, logo_format=logo_format)
     pdf.add_page()
     pdf.set_font('Arial', 'B', 14)
     pdf.cell(0, 10, 'Sumário dos Resultados', 0, 1, 'L')
@@ -142,16 +158,13 @@ def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
+    # Gera o PDF final em memória
     buffer = io.BytesIO()
     pdf.output(buffer)
-    
-    if logo_path and os.path.exists(logo_path):
-        os.remove(logo_path)
-        
     return buffer.getvalue()
 
 # ==============================================================================
-# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO (SEM ALTERAÇÕES) ---
+# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO (Sem alterações) ---
 # ==============================================================================
 def pagina_do_questionario():
     # O código desta função permanece inalterado
@@ -228,9 +241,8 @@ def pagina_do_questionario():
     else:
         st.warning("Por favor, navegue por todas as abas e responda às perguntas restantes.")
 
-
 # ==============================================================================
-# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (COM A CORREÇÃO DE MEMÓRIA) ---
+# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (Sem alterações na lógica da página) ---
 # ==============================================================================
 def pagina_do_administrador():
     st.title("🔑 Painel do Consultor")
@@ -324,11 +336,9 @@ def pagina_do_administrador():
     st.header("📄 Exportar Relatório e Dados")
     st.info("Para incluir um logo no relatório PDF, cole o URL da imagem no campo abaixo.")
     
-    # ✅ MELHORIA: Usa st.session_state para "lembrar" o URL do logo
     if 'logo_url' not in st.session_state:
-        st.session_state.logo_url = "" # Inicializa a variável na memória
+        st.session_state.logo_url = ""
 
-    # O 'key' conecta este campo de texto à variável na memória
     st.text_input(
         "URL do Logo (opcional):", 
         key="logo_url", 
@@ -339,7 +349,6 @@ def pagina_do_administrador():
     
     with col1:
         if not df_medias.empty:
-            # Usa o valor da memória (st.session_state.logo_url) para gerar o PDF
             pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas, st.session_state.logo_url)
             st.download_button(
                 label="📥 Gerar e Descarregar Relatório (.pdf)", 
@@ -362,7 +371,7 @@ def pagina_do_administrador():
             )
 
 # ==============================================================================
-# --- ROTEADOR PRINCIPAL DA APLICAÇÃO (SEM ALTERAÇÕES) ---
+# --- ROTEADOR PRINCIPAL DA APLICAÇÃO (Sem alterações) ---
 # ==============================================================================
 def main():
     """Verifica a URL para decidir qual página mostrar."""
