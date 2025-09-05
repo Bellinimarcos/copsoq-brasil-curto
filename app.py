@@ -59,18 +59,57 @@ def carregar_dados_completos(_gc):
         st.error(f"Ocorreu um erro inesperado ao carregar os dados: {e}")
         return pd.DataFrame()
 
-# --- FUNÇÃO DE GERAÇÃO DE PDF ---
-class PDF(FPDF):
-    def header(self):
-        # Logo textual estilizado
-        self.set_font('Arial', 'B', 16)
-        self.set_text_color(0, 51, 102)  # Azul escuro
-        self.cell(0, 10, 'IPSI', 0, 0, 'L')
-        self.ln(5)
+# --- MODIFICAÇÃO: FUNÇÃO DE GERAÇÃO DE PDF COM LOGO ---
+
+# NOVA FUNÇÃO: Para baixar o logo de uma URL e salvar temporariamente
+def baixar_logo(url):
+    """Baixa uma imagem de uma URL e a salva como um arquivo temporário."""
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, stream=True)
+        response.raise_for_status() # Lança um erro para status ruins (4xx ou 5xx)
         
-        self.set_font('Arial', 'I', 10)
-        self.set_text_color(102, 102, 102)  # Cinza
-        self.cell(0, 10, 'Consultoria em Saúde Organizacional', 0, 1, 'L')
+        # Usa BytesIO para manipular a imagem em memória
+        img_buffer = io.BytesIO(response.content)
+        
+        # Abre com PIL para validar e pegar o formato
+        img = Image.open(img_buffer)
+        
+        # Salva temporariamente para o FPDF usar
+        temp_path = "logo_temp.png" 
+        img.save(temp_path)
+        
+        return temp_path
+    except requests.exceptions.RequestException as e:
+        st.warning(f"Não foi possível baixar o logo: {e}. O PDF será gerado sem ele.")
+        return None
+    except Exception as e:
+        st.warning(f"Erro ao processar a imagem do logo: {e}. O PDF será gerado sem ele.")
+        return None
+
+class PDF(FPDF):
+    def __init__(self, logo_path=None):
+        super().__init__()
+        self.logo_path = logo_path
+
+    def header(self):
+        # ADIÇÃO: Lógica para adicionar o logo se ele existir
+        if self.logo_path and os.path.exists(self.logo_path):
+            try:
+                # Adiciona o logo mantendo a proporção, com 8mm de altura máxima
+                self.image(self.logo_path, 10, 8, h=12) 
+            except Exception as e:
+                # Se houver erro ao adicionar a imagem, ele não quebra a geração do PDF
+                pass
+        else:
+            # Se não houver logo, usa o cabeçalho de texto original
+            self.set_font('Arial', 'B', 16)
+            self.set_text_color(0, 51, 102)  # Azul escuro
+            self.cell(0, 10, 'IPSI', 0, 0, 'L')
+            self.ln(5)
+            self.set_font('Arial', 'I', 10)
+            self.set_text_color(102, 102, 102)  # Cinza
+            self.cell(0, 10, 'Consultoria em Saúde Organizacional', 0, 1, 'L')
         
         # Linha divisória
         self.set_line_width(0.5)
@@ -89,8 +128,13 @@ class PDF(FPDF):
         self.set_font('Arial', 'I', 8)
         self.cell(0, 10, f'Página {self.page_no()}', 0, 0, 'C')
 
-def gerar_relatorio_pdf(df_medias, total_respostas):
-    pdf = PDF()
+# MODIFICADO: Agora aceita uma URL de logo como parâmetro
+def gerar_relatorio_pdf(df_medias, total_respostas, logo_url=None):
+    logo_path = None
+    if logo_url:
+        logo_path = baixar_logo(logo_url)
+        
+    pdf = PDF(logo_path=logo_path)
     pdf.add_page()
     pdf.set_font('Arial', 'B', 14)
     pdf.cell(0, 10, 'Sumário dos Resultados', 0, 1, 'L')
@@ -110,13 +154,17 @@ def gerar_relatorio_pdf(df_medias, total_respostas):
         pdf.cell(col_width_pontuacao, 8, f"{row['Pontuação Média']:.2f}", 1, 1, 'C')
     pdf.ln(10)
     
-    # ✅ CORREÇÃO APLICADA: Usa um buffer de memória para gerar os bytes do PDF de forma segura.
     buffer = io.BytesIO()
     pdf.output(buffer)
+    
+    # Limpa o arquivo de logo temporário após o uso
+    if logo_path and os.path.exists(logo_path):
+        os.remove(logo_path)
+        
     return buffer.getvalue()
 
 # ==============================================================================
-# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO ---
+# --- PÁGINA 1: QUESTIONÁRIO PÚBLICO (SEM ALTERAÇÕES) ---
 # ==============================================================================
 def pagina_do_questionario():
     def salvar_dados(dados_para_salvar):
@@ -146,7 +194,6 @@ def pagina_do_questionario():
 
     st.title("🧠 COPSOQ II – Versão Curta (Validada para o Brasil)")
     
-    # --- BLOCO DE INSTRUÇÕES COMPLETO ---
     with st.expander("Clique aqui para ver as instruções completas", expanded=True):
         st.markdown("""
         **Prezado(a) Colaborador(a),**
@@ -195,69 +242,134 @@ def pagina_do_questionario():
 
 
 # ==============================================================================
-# --- PÁGINA 2: PAINEL DO ADMINISTRADOR ---
+# --- PÁGINA 2: PAINEL DO ADMINISTRADOR (TOTALMENTE REFORMULADO) ---
 # ==============================================================================
 def pagina_do_administrador():
-    st.title("🔑 Painel do Consultor (COPSOQ II - Brasil)")
+    st.title("🔑 Painel do Consultor")
+    st.markdown("Bem-vindo à área de análise de resultados do diagnóstico COPSOQ II.")
+
     try:
         SENHA_CORRETA = st.secrets["admin"]["ADMIN_PASSWORD"]
     except (KeyError, FileNotFoundError):
         st.error("A senha de administrador não foi configurada na secção [admin] dos 'Secrets'.")
         return
-    st.header("Acesso à Área Restrita")
-    senha_inserida = st.text_input("Por favor, insira a senha de acesso:", type="password")
-    if not senha_inserida: return
-    if senha_inserida != SENHA_CORRETA:
-        st.error("Senha incorreta.")
+
+    # Layout de login
+    if 'autenticado' not in st.session_state:
+        st.session_state.autenticado = False
+
+    if not st.session_state.autenticado:
+        st.header("Acesso à Área Restrita")
+        senha_inserida = st.text_input("Por favor, insira a senha de acesso:", type="password", key="senha")
+        if st.button("Entrar"):
+            if senha_inserida == SENHA_CORRETA:
+                st.session_state.autenticado = True
+                st.rerun()
+            elif senha_inserida:
+                st.error("Senha incorreta.")
         return
+
+    # --- Se autenticado, mostra o painel ---
     st.success("Acesso garantido!")
     st.divider()
+
     gc = conectar_gsheet()
     df = carregar_dados_completos(gc)
+
     if df.empty:
         st.warning("Ainda não há dados para analisar.")
         return
-    st.header("📊 Painel de Resultados Gerais")
+
     total_respostas = len(df)
     st.metric("Total de Respostas Recebidas", f"{total_respostas}")
+    st.divider()
+
+    # --- SEÇÃO DE ANÁLISE ---
+    st.header("📊 Análise Geral dos Resultados")
+    
     nomes_dimensoes = list(motor.definicao_dimensoes.keys())
     df_analise = df.copy()
+    
     for dimensao in nomes_dimensoes:
         if dimensao in df_analise.columns:
             if df_analise[dimensao].dtype == 'object':
                 df_analise[dimensao] = df_analise[dimensao].str.replace(',', '.', regex=False)
             df_analise[dimensao] = pd.to_numeric(df_analise[dimensao], errors='coerce')
+            
     dimensoes_presentes = [dim for dim in nomes_dimensoes if dim in df_analise.columns and pd.api.types.is_numeric_dtype(df_analise[dim])]
+    
     if not dimensoes_presentes:
         st.error("Erro de Análise: Nenhuma coluna de dimensão com dados numéricos válidos foi encontrada.")
         return
+        
     medias = df_analise[dimensoes_presentes].mean().sort_values(ascending=True)
     df_medias = medias.reset_index()
     df_medias.columns = ['Dimensão', 'Pontuação Média']
+    
     def estilo_semaforo(row):
         valor = row['Pontuação Média']
-        if valor <= 33.3: return ['background-color: #28a745'] * 2
-        elif valor <= 66.6: return ['background-color: #ffc107'] * 2
-        else: return ['background-color: #dc3545'] * 2
-    st.subheader("Média Geral por Dimensão (0-100)")
-    if not df_medias.empty:
-        st.dataframe(df_medias.style.apply(estilo_semaforo, axis=1).format({'Pontuação Média': "{:.2f}"}), use_container_width=True)
-        fig = px.bar(df_medias, x='Pontuação Média', y='Dimensão', orientation='h', title='Pontuação Média por Dimensão', text='Pontuação Média', color='Pontuação Média', color_continuous_scale='RdYlGn_r')
-        st.plotly_chart(fig, use_container_width=True)
+        if valor <= 33.3: return ['background-color: #d4edda; color: #155724'] * 2 # Verde
+        elif valor <= 66.6: return ['background-color: #fff3cd; color: #856404'] * 2 # Amarelo
+        else: return ['background-color: #f8d7da; color: #721c24'] * 2 # Vermelho
+
+    tab1, tab2 = st.tabs(["Visão Gráfica", "Tabela Detalhada"])
+
+    with tab1:
+        st.subheader("Pontuação Média por Dimensão (0-100)")
+        if not df_medias.empty:
+            fig = px.bar(df_medias, 
+                         x='Pontuação Média', 
+                         y='Dimensão', 
+                         orientation='h', 
+                         title='Pontuação Média por Dimensão', 
+                         text=df_medias['Pontuação Média'].apply(lambda x: f'{x:.2f}'),
+                         color='Pontuação Média', 
+                         color_continuous_scale='RdYlGn_r',
+                         height=800)
+            fig.update_layout(yaxis={'categoryorder':'total ascending'})
+            st.plotly_chart(fig, use_container_width=True)
+
+    with tab2:
+        st.subheader("Tabela de Médias Gerais")
+        if not df_medias.empty:
+            st.dataframe(df_medias.style.apply(estilo_semaforo, axis=1).format({'Pontuação Média': "{:.2f}"}), use_container_width=True)
+
     st.divider()
-    st.header("📄 Gerar Relatório e Exportar Dados")
+
+    # --- NOVA SEÇÃO DE EXPORTAÇÃO ---
+    st.header("📄 Exportar Relatório e Dados")
+    st.info("Para incluir um logo no relatório PDF, cole o URL da imagem no campo abaixo.")
+    
+    logo_url = st.text_input("URL do Logo (opcional):", placeholder="https://exemplo.com/logo.png")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
         if not df_medias.empty:
-            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas)
-            st.download_button(label="Descarregar Relatório (.pdf)", data=pdf_bytes, file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', mime='application/pdf')
+            # Passa a URL do logo para a função de gerar PDF
+            pdf_bytes = gerar_relatorio_pdf(df_medias, total_respostas, logo_url)
+            st.download_button(
+                label="📥 Gerar e Descarregar Relatório (.pdf)", 
+                data=pdf_bytes, 
+                file_name=f'relatorio_copsoq_br_{datetime.now().strftime("%Y%m%d")}.pdf', 
+                mime='application/pdf',
+                use_container_width=True,
+                type="primary"
+            )
+
     with col2:
         if not df.empty:
             csv = df.to_csv(index=False).encode('utf-8')
-            st.download_button(label="Descarregar Dados Brutos (.csv)", data=csv, file_name='dados_brutos_copsoq_br.csv', mime='text/csv')
+            st.download_button(
+                label="💾 Descarregar Dados Brutos (.csv)", 
+                data=csv, 
+                file_name='dados_brutos_copsoq_br.csv', 
+                mime='text/csv',
+                use_container_width=True
+            )
 
 # ==============================================================================
-# --- ROTEADOR PRINCIPAL DA APLICAÇÃO ---
+# --- ROTEADOR PRINCIPAL DA APLICAÇÃO (SEM ALTERAÇÕES) ---
 # ==============================================================================
 def main():
     """Verifica a URL para decidir qual página mostrar."""
@@ -269,3 +381,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
