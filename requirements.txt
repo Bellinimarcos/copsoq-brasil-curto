@@ -3,5 +3,5 @@ gspread
 pandas
 plotly
 fpdf2
-kaleido
+Pillow
 requests
